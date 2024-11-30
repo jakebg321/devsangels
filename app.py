@@ -192,6 +192,7 @@ def generate_message(bot_type):
         
         # Generate message
         message = bot.generate_response()
+        logger.info(f"Generated message for {bot_type}: {message[:50]}...")
         
         try:
             # Attempt to post to Twitter
@@ -204,10 +205,15 @@ def generate_message(bot_type):
                     'tweet_id': tweet_id,
                     'success': True
                 })
+            else:
+                return jsonify({
+                    'message': message,
+                    'error': 'Failed to post to Twitter',
+                    'success': False
+                }), 500
                 
         except Exception as e:
             logger.error(f"Twitter API error: {str(e)}")
-            # Return message even if Twitter post fails
             return jsonify({
                 'message': message,
                 'error': str(e),

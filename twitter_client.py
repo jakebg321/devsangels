@@ -36,6 +36,18 @@ class TwitterClient:
         except Exception as e:
             self.logger.error(f"Failed to authenticate Twitter client for {bot_type}: {e}")
             raise
+    def update_auth(self, access_token: str, access_token_secret: str):
+        """Update authentication with new tokens"""
+        try:
+            self.config['access_token'] = access_token
+            self.config['access_token_secret'] = access_token_secret
+            
+            # Reinitialize auth with new tokens
+            self.setup_auth()
+            self.logger.info(f"Successfully updated authentication for {self.bot_type}")
+        except Exception as e:
+            self.logger.error(f"Failed to update authentication: {e}")
+            raise
 
     async def post_tweet(self, message: str) -> Optional[str]:
         """Post a tweet and return its ID"""

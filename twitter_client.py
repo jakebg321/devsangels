@@ -50,15 +50,22 @@ class TwitterClient:
             self.logger.error(f"Authentication setup failed: {str(e)}")
             raise
 
+    def clean_message(self, message: str) -> str:
+        """Remove special symbols from message before posting"""
+        return message.replace('⊙', '').replace('◎', '').strip()
+
     def post_tweet(self, message: str) -> Optional[str]:
         """Post a tweet using V2 endpoint"""
         try:
-            if not message or len(message) > 280:
+            if not message or len(message) > 180:
                 self.logger.error("Invalid tweet content")
                 return None
             
+            # Clean the message before posting
+            cleaned_message = self.clean_message(message)
+            
             self.logger.info(f"Attempting to post tweet for {self.bot_type}")
-            response = self.client.create_tweet(text=message)
+            response = self.client.create_tweet(text=cleaned_message)
             
             if response.data:
                 tweet_id = response.data['id']
@@ -77,8 +84,11 @@ class TwitterClient:
                 self.logger.error("Invalid reply content")
                 return None
             
+            # Clean the message before posting
+            cleaned_message = self.clean_message(message)
+            
             response = self.client.create_tweet(
-                text=message,
+                text=cleaned_message,
                 in_reply_to_tweet_id=reply_to_id
             )
             

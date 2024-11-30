@@ -139,12 +139,20 @@ class ConversationManager:
             self.tracker.start_conversation(conversation_id, starter, initial_tweet, tweet_id)
             self.scheduler.mark_conversation_started()
             
+            # Add this: Queue the initial conversation data for processing
+            initial_conv_data = {
+                'conversation_id': conversation_id,
+                'last_bot': starter,
+                'messages': [initial_tweet],
+                'last_reply_time': datetime.now()
+            }
+            self.conversation_queue.put(initial_conv_data)
+            
             return conversation_id
             
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
             raise
-
     def _process_conversations(self):
         while self.running:
             try:

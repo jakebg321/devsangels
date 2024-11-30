@@ -74,8 +74,13 @@ def twitter_auth(bot_type):
         if bot_type not in ['angel', 'devil']:
             return jsonify({'error': 'Invalid bot type'}), 400
 
-        auth_url = twitter_auth_manager.get_auth_url(bot_type, CALLBACK_URL)
+        # Store bot_type in session BEFORE the Twitter redirect
         session['bot_type'] = bot_type
+        
+        # Log the session state for debugging
+        logger.info(f"Storing bot_type in session: {bot_type}")
+        
+        auth_url = twitter_auth_manager.get_auth_url(bot_type, CALLBACK_URL)
         return redirect(auth_url)
     except Exception as e:
         logger.error(f"Twitter auth error: {e}")
@@ -113,25 +118,37 @@ def internal_error(error):
         'message': str(error)
     }), 500
 
+
 @app.route('/callback')
 def twitter_callback():
     try:
+        # Get bot_type from session
         bot_type = session.get('bot_type')
+        logger.info(f"Retrieved bot_type from session: {bot_type}")
+        
         if not bot_type:
-            raise ValueError("No bot type in session")
+            logger.error("No bot type found in session")
+            return jsonify({'error': 'No bot type in session'}), 400
 
         oauth_token = request.args.get('oauth_token')
         oauth_verifier = request.args.get('oauth_verifier')
         
         if not oauth_token or not oauth_verifier:
-            raise ValueError("Missing OAuth parameters")
+            logger.error("Missing OAuth parameters")
+            return jsonify({'error': 'Missing OAuth parameters'}), 400
 
+        # Log the OAuth parameters for debugging
+        logger.info(f"OAuth params received - token: {oauth_token[:10]}...")
+        
         twitter_auth_manager.handle_callback(
             bot_type, 
             oauth_token, 
             oauth_verifier,
             angel if bot_type == 'angel' else devil
         )
+        
+        # Clear the session after successful auth
+        session.pop('bot_type', None)
         
         return redirect(TWITTER_AUTH_SUCCESS_URL)
     except Exception as e:

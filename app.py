@@ -141,7 +141,7 @@ def twitter_callback():
 # Message Generation Routes
 @app.route('/generate/<bot_type>', methods=['GET'])
 @async_route
-async def generate_message(bot_type):
+def generate_message(bot_type):
     try:
         if bot_type.lower() == 'angel':
             response = await angel.generate_response()

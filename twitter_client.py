@@ -138,7 +138,7 @@ class TwitterClient:
         
         return validation
 
-    async def post_tweet(self, message: str) -> Optional[str]:
+    def post_tweet(self, message: str) -> Optional[str]:
         """Post a tweet with comprehensive logging"""
         start_time = time.time()
         
@@ -180,7 +180,7 @@ class TwitterClient:
             self.logger.error(f"Unexpected error posting tweet: {str(e)}")
             raise
             
-    async def post_reply(self, message: str, reply_to_id: str) -> Optional[str]:
+    def post_reply(self, message: str, reply_to_id: str) -> Optional[str]:
         """Post a reply to a specific tweet with comprehensive logging"""
         start_time = time.time()
         

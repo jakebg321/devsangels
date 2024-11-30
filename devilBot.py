@@ -14,7 +14,7 @@ class DevilBot:
         self.twitter = TwitterClient('devil_bot')
         self.logger.info("DevilBot initialized")
         
-    async def post_to_twitter(self, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
+    def post_to_twitter(self, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
         """Post message to Twitter, either as new tweet or reply"""
         try:
             if reply_to_id:

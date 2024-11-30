@@ -12,7 +12,7 @@ class AngelBot:
         # Initialize Twitter client with just the bot type
         self.twitter = TwitterClient('angel_bot')
         self.logger.info("AngelBot initialized")
-    async def post_to_twitter(self, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
+    def post_to_twitter(self, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
         """Post message to Twitter, either as new tweet or reply"""
         try:
             if reply_to_id:

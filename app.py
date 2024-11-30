@@ -122,37 +122,58 @@ def internal_error(error):
 @app.route('/callback')
 def twitter_callback():
     try:
+        # Add detailed session logging
+        logger.info(f"Callback received. Session contents: {dict(session)}")
+        logger.info(f"Callback parameters: {dict(request.args)}")
+        
         # Get bot_type from session
         bot_type = session.get('bot_type')
-        logger.info(f"Retrieved bot_type from session: {bot_type}")
+        logger.info(f"Bot type from session: {bot_type}")
         
+        # If no bot_type in session, try to determine from oauth_token
         if not bot_type:
-            logger.error("No bot type found in session")
-            return jsonify({'error': 'No bot type in session'}), 400
+            oauth_token = request.args.get('oauth_token')
+            # Check if token matches angel or devil's request token
+            if oauth_token:
+                if angel.twitter.auth.request_token.get('oauth_token') == oauth_token:
+                    bot_type = 'angel'
+                elif devil.twitter.auth.request_token.get('oauth_token') == oauth_token:
+                    bot_type = 'devil'
+                logger.info(f"Determined bot_type from oauth_token: {bot_type}")
 
-        oauth_token = request.args.get('oauth_token')
+        if not bot_type:
+            logger.error("Could not determine bot type")
+            return redirect(TWITTER_AUTH_FAILURE_URL)
+
         oauth_verifier = request.args.get('oauth_verifier')
-        
-        if not oauth_token or not oauth_verifier:
-            logger.error("Missing OAuth parameters")
-            return jsonify({'error': 'Missing OAuth parameters'}), 400
+        if not oauth_verifier:
+            logger.error("Missing oauth_verifier")
+            return redirect(TWITTER_AUTH_FAILURE_URL)
 
-        # Log the OAuth parameters for debugging
-        logger.info(f"OAuth params received - token: {oauth_token[:10]}...")
+        # Get the appropriate bot instance
+        bot = angel if bot_type == 'angel' else devil
         
-        twitter_auth_manager.handle_callback(
-            bot_type, 
-            oauth_token, 
-            oauth_verifier,
-            angel if bot_type == 'angel' else devil
-        )
-        
-        # Clear the session after successful auth
-        session.pop('bot_type', None)
-        
-        return redirect(TWITTER_AUTH_SUCCESS_URL)
+        try:
+            # Handle the callback
+            twitter_auth_manager.handle_callback(
+                bot_type,
+                oauth_token,
+                oauth_verifier,
+                bot
+            )
+            
+            # Test the authentication immediately
+            test_tweet = bot.twitter.api.verify_credentials()
+            logger.info(f"Authentication verified for {bot_type} bot: @{test_tweet.screen_name}")
+            
+            return redirect(TWITTER_AUTH_SUCCESS_URL)
+            
+        except Exception as e:
+            logger.error(f"Error during callback handling: {str(e)}")
+            return redirect(TWITTER_AUTH_FAILURE_URL)
+            
     except Exception as e:
-        logger.error(f"Twitter callback error: {e}")
+        logger.error(f"Callback error: {str(e)}")
         return redirect(TWITTER_AUTH_FAILURE_URL)
 
 # Message Generation Routes

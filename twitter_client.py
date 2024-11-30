@@ -139,43 +139,28 @@ class TwitterClient:
         return validation
 
     def post_tweet(self, message: str) -> Optional[str]:
-        """Post a tweet with comprehensive logging"""
-        start_time = time.time()
-        
+        """Post message to Twitter with detailed logging"""
         try:
-            # Log attempt
-            self._log_tweet_attempt(message)
+            self.logger.info(f"Attempting to post tweet: {message[:50]}...")
             
-            # Validate tweet
-            validation = self._validate_tweet(message)
-            if not validation["valid"]:
-                self.logger.error(f"Tweet validation failed: {validation['errors']}")
-                return None
+            # Verify credentials before posting
+            credentials = self.api.verify_credentials()
+            self.logger.info(f"Verified credentials for @{credentials.screen_name}")
             
-            # Attempt to post
+            # Post the tweet
+            self.logger.info("Sending tweet to Twitter API...")
             tweet = self.api.update_status(message)
             
-            # Log success
-            post_time = time.time() - start_time
-            self.logger.info(f"Successfully posted tweet {tweet.id_str} in {post_time:.2f}s")
-            self.logger.debug(f"Tweet URL: https://twitter.com/i/status/{tweet.id_str}")
-            
-            # Log current rate limits
-            self._log_rate_limits()
+            tweet_url = f"https://twitter.com/i/status/{tweet.id_str}"
+            self.logger.info(f"Successfully posted tweet: {tweet_url}")
             
             return tweet.id_str
             
-        except tweepy.RateLimitError as e:
-            self.logger.error(f"Rate limit exceeded: {str(e)}")
-            self.rate_limit_logger.error(f"Rate limit hit while posting tweet")
-            raise
-            
         except tweepy.TweepError as e:
-            self.logger.error(f"Failed to post tweet: {str(e)}")
-            if "duplicate" in str(e).lower():
-                self.logger.warning("Duplicate tweet detected")
+            self.logger.error(f"Twitter API error: {str(e)}")
+            if 'authentication' in str(e).lower():
+                self.logger.error("Authentication error - tokens may be invalid")
             raise
-            
         except Exception as e:
             self.logger.error(f"Unexpected error posting tweet: {str(e)}")
             raise

@@ -140,13 +140,12 @@ def twitter_callback():
 
 # Message Generation Routes
 @app.route('/generate/<bot_type>', methods=['GET'])
-@async_route
 def generate_message(bot_type):
     try:
         if bot_type.lower() == 'angel':
-            response = await angel.generate_response()
+            response = angel.generate_response()
         elif bot_type.lower() == 'devil':
-            response = await devil.generate_response()
+            response = devil.generate_response()
         else:
             return jsonify({'error': 'Invalid bot type'}), 400
             
@@ -156,13 +155,13 @@ def generate_message(bot_type):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/respond/<bot_type>/<message>', methods=['GET'])
-@async_route
-async def respond_to_message(bot_type, message):
+
+def respond_to_message(bot_type, message):
     try:
         if bot_type.lower() == 'angel':
-            response = await angel.generate_response(message)
+            response =  angel.generate_response(message)
         elif bot_type.lower() == 'devil':
-            response = await devil.generate_response(message)
+            response =  devil.generate_response(message)
         else:
             return jsonify({'error': 'Invalid bot type'}), 400
             
@@ -173,10 +172,9 @@ async def respond_to_message(bot_type, message):
 
 # Conversation Management Routes
 @app.route('/start_conversation', methods=['GET'])
-@async_route
-async def start_new_conversation():
+def start_new_conversation():
     try:
-        conversation_id = await conversation_manager.start_conversation()
+        conversation_id =  conversation_manager.start_conversation()
         return jsonify({
             'status': 'success', 
             'conversation_id': conversation_id

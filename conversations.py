@@ -6,7 +6,6 @@ import random
 from datetime import datetime, timedelta
 import logging
 from logger_config import setup_logger
-import asyncio
 
 class ConversationScheduler:
     def __init__(self, live_mode=False):
@@ -18,7 +17,6 @@ class ConversationScheduler:
     def can_start_new_conversation(self) -> bool:
         if not self.last_conversation_time:
             return True
-            
         time_since_last = datetime.now() - self.last_conversation_time
         return time_since_last >= self.conversation_interval
         
@@ -26,7 +24,6 @@ class ConversationScheduler:
         self.last_conversation_time = datetime.now()
 
     def get_wait_time(self) -> timedelta:
-        """Calculate remaining wait time until next conversation can start"""
         if not self.last_conversation_time:
             return timedelta(0)
         return max(
@@ -67,7 +64,6 @@ class ConversationTracker:
             self.conversations[conversation_id]['reply_count'] += 1
             
     def mark_error(self, conversation_id: str, error: str):
-        """Track errors in conversation"""
         if conversation_id in self.conversations:
             self.conversations[conversation_id]['last_error'] = {
                 'error': str(error),
@@ -75,7 +71,6 @@ class ConversationTracker:
             }
             
     def get_last_tweet_id(self, conversation_id: str) -> Optional[str]:
-        """Get the most recent tweet ID for a conversation"""
         if conversation_id in self.conversations:
             for message in reversed(self.conversations[conversation_id]['messages']):
                 if message.get('tweet_id'):
@@ -101,19 +96,13 @@ class ConversationManager:
         self.error_count = 0
         self.last_error_time = None
         
-        # Test mode adjustments
-        if test_mode:
-            self.min_delay = 5
-            self.max_delay = 10
-        
     def _generate_conversation_id(self) -> str:
         return f"conv_{int(time.time())}_{random.randint(1000, 9999)}"
 
-    async def _post_to_twitter(self, bot, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
-        """Handle Twitter posting with retries"""
+    def _post_to_twitter(self, bot, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
         for attempt in range(self.max_retries):
             try:
-                tweet_id = await bot.post_to_twitter(message, reply_to_id)
+                tweet_id = bot.post_to_twitter(message, reply_to_id)
                 if tweet_id:
                     return tweet_id
             except Exception as e:
@@ -123,8 +112,7 @@ class ConversationManager:
                 time.sleep(2 ** attempt)  # Exponential backoff
         return None
         
-    async def start_conversation(self) -> Optional[str]:
-        """Initiates a new conversation if timing allows"""
+    def start_conversation(self) -> Optional[str]:
         try:
             if not self.scheduler.can_start_new_conversation():
                 wait_time = self.scheduler.get_wait_time()
@@ -141,7 +129,7 @@ class ConversationManager:
             # Post to Twitter if not in test mode
             tweet_id = None
             if not self.test_mode:
-                tweet_id = await self._post_to_twitter(bot, initial_tweet)
+                tweet_id = self._post_to_twitter(bot, initial_tweet)
             
             # Track conversation
             self.tracker.start_conversation(conversation_id, starter, initial_tweet, tweet_id)
@@ -168,8 +156,7 @@ class ConversationManager:
             self.last_error_time = datetime.now()
             raise
             
-    async def _process_conversations(self):
-        """Process conversations from the queue"""
+    def _process_conversations(self):
         while self.running:
             try:
                 if not self.conversation_queue.empty():
@@ -182,7 +169,7 @@ class ConversationManager:
                     
                     # Calculate and apply delay
                     delay = random.randint(self.min_delay, self.max_delay)
-                    await asyncio.sleep(delay)
+                    time.sleep(delay)
                     
                     conversation = self.tracker.conversations[conv_data['conversation_id']]
                     if conversation['reply_count'] >= 6 or conversation['status'] != 'active':
@@ -192,11 +179,11 @@ class ConversationManager:
                     # Generate reply from opposite bot
                     last_message = conv_data['messages'][-1]
                     if conv_data['last_bot'] == 'angel':
-                        reply = await self.devil_bot.generate_response(last_message)
+                        reply = self.devil_bot.generate_response(last_message)
                         replying_bot = 'devil'
                         bot = self.devil_bot
                     else:
-                        reply = await self.angel_bot.generate_response(last_message)
+                        reply = self.angel_bot.generate_response(last_message)
                         replying_bot = 'angel'
                         bot = self.angel_bot
                     
@@ -204,7 +191,7 @@ class ConversationManager:
                     tweet_id = None
                     if not self.test_mode:
                         reply_to_id = self.tracker.get_last_tweet_id(conv_data['conversation_id'])
-                        tweet_id = await bot.post_to_twitter(reply, reply_to_id)
+                        tweet_id = self._post_to_twitter(bot, reply, reply_to_id)
                     
                     # Calculate actual delay from last reply
                     actual_delay = (datetime.now() - conv_data['last_reply_time']).total_seconds()
@@ -230,9 +217,9 @@ class ConversationManager:
                 self.error_count += 1
                 self.last_error_time = datetime.now()
                 
-            await asyncio.sleep(1)  # Prevent busy waiting
+            time.sleep(1)  # Prevent busy waiting
+
     def get_conversation_timing_stats(self, conversation_id: str) -> Dict:
-        """Get timing statistics for a conversation"""
         if conversation_id not in self.tracker.conversations:
             return {}
             
@@ -248,12 +235,11 @@ class ConversationManager:
             'last_error': conversation.get('last_error'),
             'tweet_ids': [m.get('tweet_id') for m in messages if m.get('tweet_id')]
         }
+
     def process_conversation_queue(self):
-        """Synchronous wrapper for _process_conversations"""
-        asyncio.run(self._process_conversations())
+        self._process_conversations()
             
     def start(self):
-        """Start the conversation manager"""
         self.running = True
         self.processor_thread = threading.Thread(target=self.process_conversation_queue)
         self.processor_thread.daemon = True
@@ -261,7 +247,6 @@ class ConversationManager:
         self.logger.info("Conversation manager started")
 
     def stop(self):
-        """Stop the conversation manager"""
         self.running = False
         if hasattr(self, 'processor_thread'):
             self.processor_thread.join(timeout=5)

@@ -6,10 +6,124 @@ from logger_config import setup_logger
 logger = setup_logger('domain_manager')
 
 class DomainManager:
-    def __init__(self, domains: Dict):
-        self.domains = domains
+    def __init__(self, bot_type: str):
+        self.bot_type = bot_type
+        self.domains = self._get_domains()
         self.last_used = []
-        logger.info("DomainManager initialized")
+        logger.info(f"DomainManager initialized for {bot_type}")
+
+    def _get_domains(self) -> Dict:
+        """Get domains based on bot type"""
+        if self.bot_type == 'angel':
+            return {
+                'crypto_wisdom': {
+                    'trading': [
+                        'market patterns',
+                        'trading harmony',
+                        'balanced portfolios',
+                        'long term vision',
+                        'sustainable growth',
+                        'market cycles',
+                        'patient accumulation',
+                        'risk management',
+                        'trend recognition',
+                        'value stability'
+                    ],
+                    'blockchain': [
+                        'network harmony',
+                        'consensus patterns',
+                        'stable protocols',
+                        'secure transactions',
+                        'trusted validation',
+                        'blockchain integrity',
+                        'distributed truth',
+                        'protocol balance',
+                        'network peace',
+                        'chain harmony'
+                    ]
+                },
+                'inner_peace': {
+                    'meditation': [
+                        'mindful trading',
+                        'peaceful mind',
+                        'inner balance',
+                        'emotional control',
+                        'mental clarity',
+                        'focused breathing',
+                        'trading zen',
+                        'market meditation',
+                        'stress release',
+                        'conscious decisions'
+                    ],
+                    'wellness': [
+                        'healthy habits',
+                        'balanced life',
+                        'natural rhythms',
+                        'clean living',
+                        'positive energy',
+                        'mind body balance',
+                        'spiritual growth',
+                        'peaceful path',
+                        'harmonious living',
+                        'energy flow'
+                    ]
+                }
+            }
+        else:  # devil domains
+            return {
+                'market_mayhem': {
+                    'trading': [
+                        'leverage addiction',
+                        'liquidation hunting',
+                        'fomo feeding',
+                        'pump schemes',
+                        'dump tricks',
+                        'whale manipulation',
+                        'fear spreading',
+                        'greed injection',
+                        'panic selling',
+                        'market breaking'
+                    ],
+                    'defi': [
+                        'rug pulls',
+                        'yield traps',
+                        'liquidity vampires',
+                        'smart contract bugs',
+                        'flash loan attacks',
+                        'governance exploitation',
+                        'token inflation',
+                        'pool manipulation',
+                        'sandwich attacks',
+                        'mev extraction'
+                    ]
+                },
+                'dark_pleasures': {
+                    'vices': [
+                        'pure hedonism',
+                        'reckless gambling',
+                        'wild parties',
+                        'substance abuse',
+                        'profit addiction',
+                        'greed embrace',
+                        'risk chasing',
+                        'pleasure seeking',
+                        'temptation',
+                        'dark desires'
+                    ],
+                    'corruption': [
+                        'moral breaking',
+                        'soul selling',
+                        'ethical twisting',
+                        'value corrupting',
+                        'mind poisoning',
+                        'will breaking',
+                        'desire amplifying',
+                        'conscience killing',
+                        'responsibility abandoning',
+                        'inhibition destroying'
+                    ]
+                }
+            }
 
     def select_domain(self) -> Tuple[str, str, List[str]]:
         """Select domain, subdomain, and keywords while avoiding recent choices"""

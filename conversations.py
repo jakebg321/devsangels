@@ -169,7 +169,7 @@ class ConversationManager:
             raise
             
     async def _process_conversations(self):
-        """Background thread to process conversation replies"""
+        """Process conversations from the queue"""
         while self.running:
             try:
                 if not self.conversation_queue.empty():
@@ -182,7 +182,7 @@ class ConversationManager:
                     
                     # Calculate and apply delay
                     delay = random.randint(self.min_delay, self.max_delay)
-                    time.sleep(delay)
+                    await asyncio.sleep(delay)
                     
                     conversation = self.tracker.conversations[conv_data['conversation_id']]
                     if conversation['reply_count'] >= 6 or conversation['status'] != 'active':
@@ -192,11 +192,11 @@ class ConversationManager:
                     # Generate reply from opposite bot
                     last_message = conv_data['messages'][-1]
                     if conv_data['last_bot'] == 'angel':
-                        reply = self.devil_bot.generate_response(last_message)
+                        reply = await self.devil_bot.generate_response(last_message)
                         replying_bot = 'devil'
                         bot = self.devil_bot
                     else:
-                        reply = self.angel_bot.generate_response(last_message)
+                        reply = await self.angel_bot.generate_response(last_message)
                         replying_bot = 'angel'
                         bot = self.angel_bot
                     
@@ -204,7 +204,7 @@ class ConversationManager:
                     tweet_id = None
                     if not self.test_mode:
                         reply_to_id = self.tracker.get_last_tweet_id(conv_data['conversation_id'])
-                        tweet_id = await self._post_to_twitter(bot, reply, reply_to_id)
+                        tweet_id = await bot.post_to_twitter(reply, reply_to_id)
                     
                     # Calculate actual delay from last reply
                     actual_delay = (datetime.now() - conv_data['last_reply_time']).total_seconds()
@@ -213,7 +213,7 @@ class ConversationManager:
                     self.tracker.add_reply(conv_data['conversation_id'], replying_bot, reply, actual_delay, tweet_id)
                     
                     # Print reply with timing info
-                    print(f"[Delay: {actual_delay:.1f}s] {replying_bot.upper()}: {reply}")
+                    self.logger.info(f"[Delay: {actual_delay:.1f}s] {replying_bot.upper()}: {reply}")
                     
                     # Queue next reply if conversation should continue
                     conv_data['last_bot'] = replying_bot
@@ -230,8 +230,7 @@ class ConversationManager:
                 self.error_count += 1
                 self.last_error_time = datetime.now()
                 
-            time.sleep(1)  # Prevent busy waiting
-            
+            await asyncio.sleep(1)  # Prevent busy waiting
     def get_conversation_timing_stats(self, conversation_id: str) -> Dict:
         """Get timing statistics for a conversation"""
         if conversation_id not in self.tracker.conversations:
@@ -249,16 +248,21 @@ class ConversationManager:
             'last_error': conversation.get('last_error'),
             'tweet_ids': [m.get('tweet_id') for m in messages if m.get('tweet_id')]
         }
-        
+    def process_conversation_queue(self):
+        """Synchronous wrapper for _process_conversations"""
+        asyncio.run(self._process_conversations())
+            
     def start(self):
         """Start the conversation manager"""
         self.running = True
-        self.processor_thread = threading.Thread(target=self._process_conversations)
+        self.processor_thread = threading.Thread(target=self.process_conversation_queue)
         self.processor_thread.daemon = True
         self.processor_thread.start()
-        
+        self.logger.info("Conversation manager started")
+
     def stop(self):
         """Stop the conversation manager"""
         self.running = False
         if hasattr(self, 'processor_thread'):
             self.processor_thread.join(timeout=5)
+        self.logger.info("Conversation manager stopped")

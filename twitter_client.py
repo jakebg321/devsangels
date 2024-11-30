@@ -1,8 +1,3 @@
-import tweepy
-from typing import Optional
-from logger_config import setup_logger
-from config import TWITTER_CONFIG
-
 from typing import Optional, Dict, Any
 import tweepy
 from logger_config import setup_logger
@@ -49,7 +44,7 @@ class TwitterClient:
             # Test authentication
             self._verify_credentials()
             
-        except tweepy.TweepError as e:
+        except Exception as e:
             self.auth_logger.error(f"Authentication setup failed: {str(e)}")
             raise
             
@@ -70,7 +65,7 @@ class TwitterClient:
             
             return True
             
-        except tweepy.TweepError as e:
+        except Exception as e:
             self.auth_logger.error(f"Credential verification failed: {str(e)}")
             raise
             
@@ -134,35 +129,49 @@ class TwitterClient:
             validation["valid"] = False
             validation["errors"].append("Tweet is empty")
             
-        # Add more validation as needed
-        
         return validation
 
     def post_tweet(self, message: str) -> Optional[str]:
-        """Post message to Twitter with detailed logging"""
+        """Post a tweet with comprehensive logging"""
+        start_time = time.time()
+        
         try:
-            self.logger.info(f"Attempting to post tweet: {message[:50]}...")
+            # Log attempt
+            self._log_tweet_attempt(message)
+            
+            # Validate tweet
+            validation = self._validate_tweet(message)
+            if not validation["valid"]:
+                self.logger.error(f"Tweet validation failed: {validation['errors']}")
+                return None
             
             # Verify credentials before posting
             credentials = self.api.verify_credentials()
             self.logger.info(f"Verified credentials for @{credentials.screen_name}")
             
-            # Post the tweet
+            # Attempt to post
             self.logger.info("Sending tweet to Twitter API...")
             tweet = self.api.update_status(message)
             
+            # Log success
+            post_time = time.time() - start_time
+            self.logger.info(f"Successfully posted tweet {tweet.id_str} in {post_time:.2f}s")
             tweet_url = f"https://twitter.com/i/status/{tweet.id_str}"
-            self.logger.info(f"Successfully posted tweet: {tweet_url}")
+            self.logger.info(f"Tweet URL: {tweet_url}")
+            
+            # Log current rate limits
+            self._log_rate_limits()
             
             return tweet.id_str
             
-        except tweepy.TweepError as e:
-            self.logger.error(f"Twitter API error: {str(e)}")
-            if 'authentication' in str(e).lower():
-                self.logger.error("Authentication error - tokens may be invalid")
-            raise
         except Exception as e:
-            self.logger.error(f"Unexpected error posting tweet: {str(e)}")
+            if 'Rate limit exceeded' in str(e):
+                self.logger.error(f"Rate limit exceeded: {str(e)}")
+                self.rate_limit_logger.error(f"Rate limit hit while posting tweet")
+            elif "duplicate" in str(e).lower():
+                self.logger.warning("Duplicate tweet detected")
+            else:
+                self.logger.error(f"Failed to post tweet: {str(e)}")
             raise
             
     def post_reply(self, message: str, reply_to_id: str) -> Optional[str]:
@@ -182,7 +191,7 @@ class TwitterClient:
             # Verify reply_to tweet exists
             try:
                 self.api.get_status(reply_to_id)
-            except tweepy.TweepError as e:
+            except Exception as e:
                 self.logger.error(f"Reply target tweet {reply_to_id} not found: {str(e)}")
                 raise
             
@@ -195,25 +204,21 @@ class TwitterClient:
             
             # Log success
             post_time = time.time() - start_time
+            tweet_url = f"https://twitter.com/i/status/{tweet.id_str}"
             self.logger.info(f"Successfully posted reply {tweet.id_str} to {reply_to_id} in {post_time:.2f}s")
-            self.logger.debug(f"Reply URL: https://twitter.com/i/status/{tweet.id_str}")
+            self.logger.info(f"Reply URL: {tweet_url}")
             
             # Log current rate limits
             self._log_rate_limits()
             
             return tweet.id_str
             
-        except tweepy.RateLimitError as e:
-            self.logger.error(f"Rate limit exceeded while replying: {str(e)}")
-            self.rate_limit_logger.error(f"Rate limit hit while posting reply")
-            raise
-            
-        except tweepy.TweepError as e:
-            self.logger.error(f"Failed to post reply: {str(e)}")
-            if "duplicate" in str(e).lower():
-                self.logger.warning("Duplicate reply detected")
-            raise
-            
         except Exception as e:
-            self.logger.error(f"Unexpected error posting reply: {str(e)}")
+            if 'Rate limit exceeded' in str(e):
+                self.logger.error(f"Rate limit exceeded while replying: {str(e)}")
+                self.rate_limit_logger.error(f"Rate limit hit while posting reply")
+            elif "duplicate" in str(e).lower():
+                self.logger.warning("Duplicate reply detected")
+            else:
+                self.logger.error(f"Failed to post reply: {str(e)}")
             raise

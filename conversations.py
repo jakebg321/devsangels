@@ -6,6 +6,7 @@ import random
 from datetime import datetime, timedelta
 import logging
 from logger_config import setup_logger
+import asyncio
 
 class ConversationScheduler:
     def __init__(self, live_mode=False):

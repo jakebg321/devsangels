@@ -26,20 +26,22 @@ class TwitterClient:
             self.auth_logger.info(f"Setting up authentication for {self.bot_type}")
             self.auth_logger.debug(f"Using API key: {self.config['api_key'][:5]}...")
             
-            # Initialize authentication
-            self.auth = tweepy.OAuthHandler(
-                self.config['api_key'],
-                self.config['api_secret']
+            # Initialize v2 client with OAuth 1.0a tokens
+            self.client = tweepy.Client(
+                consumer_key=self.config['api_key'],
+                consumer_secret=self.config['api_secret'],
+                access_token=self.config['access_token'],
+                access_token_secret=self.config['access_token_secret'],
+                wait_on_rate_limit=True
             )
             
-            # Set access tokens
-            self.auth.set_access_token(
+            # Initialize auth handler for compatibility
+            self.auth = tweepy.OAuth1UserHandler(
+                self.config['api_key'],
+                self.config['api_secret'],
                 self.config['access_token'],
                 self.config['access_token_secret']
             )
-            
-            # Initialize API with wait on rate limit
-            self.api = tweepy.API(self.auth, wait_on_rate_limit=True, retry_count=3)
             
             # Test authentication
             self._verify_credentials()
@@ -53,17 +55,22 @@ class TwitterClient:
         try:
             self.auth_logger.info("Verifying Twitter credentials")
             start_time = time.time()
-            credentials = self.api.verify_credentials()
+            
+            # Use v2 endpoint to verify credentials
+            user = self.client.get_me()
             verification_time = time.time() - start_time
             
-            self.auth_logger.info(f"Credentials verified successfully in {verification_time:.2f}s")
-            self.auth_logger.info(f"Connected as @{credentials.screen_name}")
-            self.auth_logger.debug(f"Account ID: {credentials.id}")
-            
-            # Log rate limit status
-            self._log_rate_limits()
-            
-            return True
+            if user.data:
+                self.auth_logger.info(f"Credentials verified successfully in {verification_time:.2f}s")
+                self.auth_logger.info(f"Connected as @{user.data.username}")
+                self.auth_logger.debug(f"Account ID: {user.data.id}")
+                
+                # Log rate limit status
+                self._log_rate_limits()
+                
+                return True
+            else:
+                raise Exception("Failed to verify credentials")
             
         except Exception as e:
             self.auth_logger.error(f"Credential verification failed: {str(e)}")
@@ -72,19 +79,9 @@ class TwitterClient:
     def _log_rate_limits(self):
         """Log current rate limit status"""
         try:
-            limits = self.api.rate_limit_status()
-            resources = limits['resources']
+            # Note: v2 rate limits are handled differently
+            self.rate_limit_logger.info("Rate limits are managed by Twitter API v2")
             
-            self.rate_limit_logger.info("Current rate limit status:")
-            for resource_type, endpoints in resources.items():
-                for endpoint, status in endpoints.items():
-                    if status['remaining'] < status['limit']:
-                        self.rate_limit_logger.warning(
-                            f"Rate limit for {endpoint}: "
-                            f"{status['remaining']}/{status['limit']} "
-                            f"remaining, resets at {datetime.fromtimestamp(status['reset'])}"
-                        )
-                        
         except Exception as e:
             self.rate_limit_logger.error(f"Failed to log rate limits: {str(e)}")
 
@@ -145,24 +142,22 @@ class TwitterClient:
                 self.logger.error(f"Tweet validation failed: {validation['errors']}")
                 return None
             
-            # Verify credentials before posting
-            credentials = self.api.verify_credentials()
-            self.logger.info(f"Verified credentials for @{credentials.screen_name}")
-            
-            # Attempt to post
+            # Attempt to post using v2 endpoint
             self.logger.info("Sending tweet to Twitter API...")
-            tweet = self.api.update_status(message)
+            response = self.client.create_tweet(text=message)
             
-            # Log success
-            post_time = time.time() - start_time
-            self.logger.info(f"Successfully posted tweet {tweet.id_str} in {post_time:.2f}s")
-            tweet_url = f"https://twitter.com/i/status/{tweet.id_str}"
-            self.logger.info(f"Tweet URL: {tweet_url}")
+            if response.data:
+                tweet_id = str(response.data['id'])
+                
+                # Log success
+                post_time = time.time() - start_time
+                self.logger.info(f"Successfully posted tweet {tweet_id} in {post_time:.2f}s")
+                tweet_url = f"https://twitter.com/i/status/{tweet_id}"
+                self.logger.info(f"Tweet URL: {tweet_url}")
+                
+                return tweet_id
             
-            # Log current rate limits
-            self._log_rate_limits()
-            
-            return tweet.id_str
+            return None
             
         except Exception as e:
             if 'Rate limit exceeded' in str(e):
@@ -188,30 +183,24 @@ class TwitterClient:
                 self.logger.error(f"Reply validation failed: {validation['errors']}")
                 return None
             
-            # Verify reply_to tweet exists
-            try:
-                self.api.get_status(reply_to_id)
-            except Exception as e:
-                self.logger.error(f"Reply target tweet {reply_to_id} not found: {str(e)}")
-                raise
-            
-            # Post reply
-            tweet = self.api.update_status(
-                message,
-                in_reply_to_status_id=reply_to_id,
-                auto_populate_reply_metadata=True
+            # Post reply using v2 endpoint
+            response = self.client.create_tweet(
+                text=message,
+                in_reply_to_tweet_id=reply_to_id
             )
             
-            # Log success
-            post_time = time.time() - start_time
-            tweet_url = f"https://twitter.com/i/status/{tweet.id_str}"
-            self.logger.info(f"Successfully posted reply {tweet.id_str} to {reply_to_id} in {post_time:.2f}s")
-            self.logger.info(f"Reply URL: {tweet_url}")
-            
-            # Log current rate limits
-            self._log_rate_limits()
-            
-            return tweet.id_str
+            if response.data:
+                tweet_id = str(response.data['id'])
+                
+                # Log success
+                post_time = time.time() - start_time
+                tweet_url = f"https://twitter.com/i/status/{tweet_id}"
+                self.logger.info(f"Successfully posted reply {tweet_id} to {reply_to_id} in {post_time:.2f}s")
+                self.logger.info(f"Reply URL: {tweet_url}")
+                
+                return tweet_id
+                
+            return None
             
         except Exception as e:
             if 'Rate limit exceeded' in str(e):

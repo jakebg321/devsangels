@@ -180,13 +180,23 @@ def twitter_callback():
 @app.route('/generate/<bot_type>', methods=['GET'])
 def generate_message(bot_type):
     try:
-        if bot_type.lower() == 'angel':
-            # Generate message
-            message = angel.generate_response()
+        # Validate bot type
+        if bot_type.lower() not in ['angel', 'devil']:
+            return jsonify({
+                'error': 'Invalid bot type',
+                'success': False
+            }), 400
             
-            # Actually post to Twitter
+        # Select appropriate bot
+        bot = angel if bot_type.lower() == 'angel' else devil
+        
+        # Generate message
+        message = bot.generate_response()
+        
+        try:
+            # Attempt to post to Twitter
             logger.info(f"Attempting to post message to Twitter: {message[:50]}...")
-            tweet_id = angel.post_to_twitter(message)
+            tweet_id = bot.post_to_twitter(message)
             
             if tweet_id:
                 return jsonify({
@@ -194,13 +204,16 @@ def generate_message(bot_type):
                     'tweet_id': tweet_id,
                     'success': True
                 })
-            else:
-                logger.error("Failed to post tweet - no tweet_id returned")
-                return jsonify({
-                    'message': message,
-                    'error': 'Failed to post to Twitter',
-                    'success': False
-                }), 500
+                
+        except Exception as e:
+            logger.error(f"Twitter API error: {str(e)}")
+            # Return message even if Twitter post fails
+            return jsonify({
+                'message': message,
+                'error': str(e),
+                'success': False,
+                'twitter_status': 'failed'
+            }), 500
                 
     except Exception as e:
         logger.error(f"Error in generate_message: {e}")

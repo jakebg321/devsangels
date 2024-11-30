@@ -9,17 +9,9 @@ class AngelBot:
         self.client = GrokClient(grok_api_key)
         self.domains = BotDomains()
         self.logger = setup_logger('angel_bot')
-        
-        # Initialize Twitter client
-        self.twitter = TwitterClient(
-            bot_type='angel',
-            api_key=os.getenv('TWITTER_ANGEL_API_KEY'),
-            api_secret=os.getenv('TWITTER_ANGEL_API_SECRET'),
-            access_token=os.getenv('TWITTER_ANGEL_ACCESS_TOKEN'),
-            access_token_secret=os.getenv('TWITTER_ANGEL_ACCESS_TOKEN_SECRET')
-        )
+        # Initialize Twitter client with just the bot type
+        self.twitter = TwitterClient('angel_bot')
         self.logger.info("AngelBot initialized")
-        
     async def post_to_twitter(self, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
         """Post message to Twitter, either as new tweet or reply"""
         try:

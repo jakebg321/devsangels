@@ -10,15 +10,8 @@ class DevilBot:
         self.client = GrokClient(grok_api_key)
         self.domains = BotDomains()
         self.logger = setup_logger('devil_bot')
-        
-        # Initialize Twitter client
-        self.twitter = TwitterClient(
-            bot_type='devil',
-            api_key=os.getenv('TWITTER_DEVIL_API_KEY'),
-            api_secret=os.getenv('TWITTER_DEVIL_API_SECRET'),
-            access_token=os.getenv('TWITTER_DEVIL_ACCESS_TOKEN'),
-            access_token_secret=os.getenv('TWITTER_DEVIL_ACCESS_TOKEN_SECRET')
-        )
+        # Initialize Twitter client with just the bot type
+        self.twitter = TwitterClient('devil_bot')
         self.logger.info("DevilBot initialized")
         
     async def post_to_twitter(self, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:

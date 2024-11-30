@@ -80,6 +80,38 @@ def twitter_auth(bot_type):
     except Exception as e:
         logger.error(f"Twitter auth error: {e}")
         return redirect(TWITTER_AUTH_FAILURE_URL)
+@app.route('/')
+def home():
+    return jsonify({
+        'status': 'running',
+        'endpoints': {
+            'generate': '/generate/<bot_type>',
+            'respond': '/respond/<bot_type>/<message>',
+            'conversation': '/conversation',
+            'health': '/health'
+        }
+    })
+@app.errorhandler(404)
+def not_found_error(error):
+    return jsonify({
+        'error': 'Not Found',
+        'message': 'The requested URL was not found on the server.',
+        'available_endpoints': {
+            'generate': '/generate/<bot_type>',
+            'respond': '/respond/<bot_type>/<message>',
+            'conversation': '/conversation',
+            'health': '/health'
+        }
+    }), 404
+
+# Error handler for 500
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return jsonify({
+        'error': 'Internal Server Error',
+        'message': str(error)
+    }), 500
 
 @app.route('/callback')
 def twitter_callback():

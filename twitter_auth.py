@@ -34,7 +34,35 @@ class TwitterAuthManager:
             config['api_secret'],
             os.getenv('TWITTER_CALLBACK_URL')
         )
+    def get_auth_url(self, bot_type: str, callback_url: str) -> str:
+        """Get the authorization URL for Twitter OAuth"""
+        try:
+            auth = self.get_auth_handler(bot_type)
+            auth.callback = callback_url
+            return auth.get_authorization_url()
+        except Exception as e:
+            self.logger.error(f"Error getting auth URL for {bot_type}: {e}")
+            raise
 
+    def handle_callback(self, bot_type: str, oauth_token: str, oauth_verifier: str, bot) -> None:
+        """Handle the OAuth callback from Twitter"""
+        try:
+            auth = self.get_auth_handler(bot_type)
+            auth.request_token = {
+                'oauth_token': oauth_token,
+                'oauth_token_secret': oauth_verifier
+            }
+            
+            # Get the access token
+            access_token, access_token_secret = auth.get_access_token(oauth_verifier)
+            
+            # Update the bot's Twitter client with new credentials
+            bot.twitter.update_auth(access_token, access_token_secret)
+            
+            self.logger.info(f"Successfully authenticated {bot_type} bot with Twitter")
+        except Exception as e:
+            self.logger.error(f"Error handling callback for {bot_type}: {e}")
+            raise
 def setup_twitter_routes(app: Flask):
     twitter_auth_manager = TwitterAuthManager()
     logger = setup_logger('twitter_routes')
@@ -121,3 +149,4 @@ def store_twitter_tokens(bot_type: str, access_token: str, access_token_secret: 
         logger = setup_logger('token_storage')
         logger.error(f"Error storing tokens for {bot_type}: {str(e)}")
         raise
+    

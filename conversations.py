@@ -129,43 +129,27 @@ class ConversationManager:
             # Post to Twitter if not in test mode
             tweet_id = None
             if not self.test_mode:
-                tweet_id = self._post_to_twitter(bot, initial_tweet)
+                self.logger.info(f"Posting initial conversation tweet for {starter}")
+                tweet_id = bot.post_to_twitter(initial_tweet)
+                if not tweet_id:
+                    raise ValueError("Failed to post initial tweet to Twitter")
+                self.logger.info(f"Successfully posted initial tweet with ID: {tweet_id}")
             
             # Track conversation
             self.tracker.start_conversation(conversation_id, starter, initial_tweet, tweet_id)
             self.scheduler.mark_conversation_started()
             
-            # Print initial tweet
-            print(f"\nNew Conversation ({conversation_id}):")
-            print(f"{starter.upper()}: {initial_tweet}")
-            
-            # Queue for replies
-            self.conversation_queue.put({
-                'conversation_id': conversation_id,
-                'last_bot': starter,
-                'messages': [initial_tweet],
-                'last_reply_time': datetime.now(),
-                'retry_count': 0
-            })
-            
             return conversation_id
             
         except Exception as e:
             self.logger.error(f"Error starting conversation: {e}")
-            self.error_count += 1
-            self.last_error_time = datetime.now()
             raise
-            
+
     def _process_conversations(self):
         while self.running:
             try:
                 if not self.conversation_queue.empty():
                     conv_data = self.conversation_queue.get()
-                    
-                    # Check retry count
-                    if conv_data.get('retry_count', 0) >= self.max_retries:
-                        self.logger.error(f"Max retries reached for conversation {conv_data['conversation_id']}")
-                        continue
                     
                     # Calculate and apply delay
                     delay = random.randint(self.min_delay, self.max_delay)
@@ -190,34 +174,28 @@ class ConversationManager:
                     # Post to Twitter if not in test mode
                     tweet_id = None
                     if not self.test_mode:
+                        self.logger.info(f"Posting reply tweet for {replying_bot}")
                         reply_to_id = self.tracker.get_last_tweet_id(conv_data['conversation_id'])
-                        tweet_id = self._post_to_twitter(bot, reply, reply_to_id)
-                    
-                    # Calculate actual delay from last reply
-                    actual_delay = (datetime.now() - conv_data['last_reply_time']).total_seconds()
+                        tweet_id = bot.post_to_twitter(reply, reply_to_id)
+                        if not tweet_id:
+                            raise ValueError(f"Failed to post reply tweet for {replying_bot}")
+                        self.logger.info(f"Successfully posted reply tweet with ID: {tweet_id}")
                     
                     # Track reply
-                    self.tracker.add_reply(conv_data['conversation_id'], replying_bot, reply, actual_delay, tweet_id)
+                    actual_delay = (datetime.now() - conv_data['last_reply_time']).total_seconds()
+                    self.tracker.add_reply(conv_data['conversation_id'], replying_bot, reply, 
+                                        actual_delay, tweet_id)
                     
-                    # Print reply with timing info
-                    self.logger.info(f"[Delay: {actual_delay:.1f}s] {replying_bot.upper()}: {reply}")
-                    
-                    # Queue next reply if conversation should continue
+                    # Queue next reply
                     conv_data['last_bot'] = replying_bot
                     conv_data['messages'].append(reply)
                     conv_data['last_reply_time'] = datetime.now()
-                    conv_data['retry_count'] = 0  # Reset retry count for next message
                     self.conversation_queue.put(conv_data)
                     
             except Exception as e:
                 self.logger.error(f"Error processing conversation: {e}")
-                conv_data['retry_count'] = conv_data.get('retry_count', 0) + 1
-                if conv_data['retry_count'] < self.max_retries:
-                    self.conversation_queue.put(conv_data)  # Retry
-                self.error_count += 1
-                self.last_error_time = datetime.now()
                 
-            time.sleep(1)  # Prevent busy waiting
+            time.sleep(1)
 
     def get_conversation_timing_stats(self, conversation_id: str) -> Dict:
         if conversation_id not in self.tracker.conversations:

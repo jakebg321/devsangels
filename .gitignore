@@ -41,7 +41,6 @@ tweet_history.json.old
 *.log
 
 # API Keys and Secrets
-config.py
 
 # Test coverage
 .coverage

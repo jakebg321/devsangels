@@ -85,7 +85,7 @@ class ConversationTracker:
 class ConversationManager:
     def __init__(self, angel_bot, devil_bot, live_mode=False, 
                  min_delay: int = 30, max_delay: int = 60,
-                 test_mode: bool = True,
+                 test_mode: bool = False,
                  max_retries: int = 3):
         self.angel_bot = angel_bot
         self.devil_bot = devil_bot

@@ -2,14 +2,33 @@ from typing import Dict, List, Optional
 import random
 from bot_core import GrokClient, BotDomains
 from logger_config import setup_logger
-
+from twitter_client import TwitterClient
+import os
 class AngelBot:
-    def __init__(self, api_key: str):
-        self.client = GrokClient(api_key)
+    def __init__(self, grok_api_key: str):
+        self.client = GrokClient(grok_api_key)
         self.domains = BotDomains()
         self.logger = setup_logger('angel_bot')
+        
+        # Initialize Twitter client
+        self.twitter = TwitterClient(
+            bot_type='angel',
+            api_key=os.getenv('TWITTER_ANGEL_API_KEY'),
+            api_secret=os.getenv('TWITTER_ANGEL_API_SECRET'),
+            access_token=os.getenv('TWITTER_ANGEL_ACCESS_TOKEN'),
+            access_token_secret=os.getenv('TWITTER_ANGEL_ACCESS_TOKEN_SECRET')
+        )
         self.logger.info("AngelBot initialized")
         
+    async def post_to_twitter(self, message: str, reply_to_id: Optional[str] = None) -> Optional[str]:
+        """Post message to Twitter, either as new tweet or reply"""
+        try:
+            if reply_to_id:
+                return self.twitter.post_reply(message, reply_to_id)
+            return self.twitter.post_tweet(message)
+        except Exception as e:
+            self.logger.error(f"Failed to post to Twitter: {e}")
+            return None
     def _generate_dynamic_prompt(self, is_initial: bool, domain=None, subdomain=None) -> str:
         domain_text = ""
         
